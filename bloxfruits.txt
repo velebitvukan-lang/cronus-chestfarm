@@ -1,7 +1,5 @@
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,10 +12,9 @@ local FRUITS = {"Rocket","Spin","Blade","Spring","Bomb","Smoke","Spike","Flame",
 local Selected = {}
 for _, f in ipairs(FRUITS) do Selected[f] = true end
 
-local State = { AutoFinish=false, AutoFarmMoney=false, FruitSniper=false, BringFruit=false }
+local State = {AutoFinish=false, AutoFarmMoney=false, FruitSniper=false, BringFruit=false}
 local lastHop = 0
 local lastQuest = 0
-local lastChest = 0
 local chestOrder = {"Chest1", "Chest2", "Chest3"}
 local chestIdx = 1
 local hoverY = 20
@@ -29,7 +26,7 @@ SG.ResetOnSpawn = false
 SG.Parent = PG
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 330, 0, 470)
+Main.Size = UDim2.new(0, 330, 0, 500)
 Main.Position = UDim2.new(0.3, 0, 0.15, 0)
 Main.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
 Main.BorderSizePixel = 2
@@ -133,7 +130,7 @@ bScan.MouseButton1Click:Connect(function()
     local chests = {}
     local found = 0
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Tool") then
+        if obj:IsA("Tool") and not obj:IsDescendantOf(LP.Character) and not obj:IsDescendantOf(LP.Backpack) then
             local nm = obj.Name
             for f, _ in pairs(Selected) do
                 if Selected[f] and string.find(string.lower(nm), string.lower(f)) then
@@ -175,12 +172,16 @@ local function extendWeapon()
     pcall(function()
         local c = LP.Character
         if not c then return end
+        local hrp = c:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
         local t = c:FindFirstChildOfClass("Tool") or (LP.Backpack and LP.Backpack:FindFirstChildOfClass("Tool"))
         if not t then return end
         local part = t:FindFirstChild("Handle") or t:FindFirstChildOfClass("BasePart")
         if not part then return end
+        part.Massless = true
+        part.CanCollide = false
         part.Size = Vector3.new(0.6, 0.6, 60)
-        part.CFrame = c.HumanoidRootPart.CFrame * CFrame.new(0, 0, -30)
+        part.CFrame = hrp.CFrame * CFrame.new(0, 0, -30)
     end)
 end
 
@@ -194,11 +195,11 @@ local function attack(enemy)
         local t = c:FindFirstChildOfClass("Tool")
         if not t and LP.Backpack then t = LP.Backpack:FindFirstChildOfClass("Tool") end
         if t then human:EquipTool(t) end
-        extendWeapon()
         local eh = enemy and enemy:FindFirstChild("HumanoidRootPart")
         if eh then
             hrp.CFrame = CFrame.lookAt(hrp.Position, eh.Position)
         end
+        extendWeapon()
         VirtualUser:CaptureController()
         VirtualUser:ClickButton1(Vector2.new(0, 0))
     end)
@@ -227,16 +228,16 @@ end
 local function bringFruits(hrp)
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("Tool") and not obj:IsDescendantOf(LP.Character) and not obj:IsDescendantOf(LP.Backpack) then
-        if fruitMatch(obj) then
-            pcall(function()
-                if obj:FindFirstChild("Handle") then
-                    obj.Handle.CFrame = hrp.CFrame
-                else
-                    obj:SetPrimaryPartCFrame(hrp.CFrame)
-                end
-            end)
+            if fruitMatch(obj) then
+                pcall(function()
+                    if obj:FindFirstChild("Handle") then
+                        obj.Handle.CFrame = hrp.CFrame
+                    else
+                        obj:SetPrimaryPartCFrame(hrp.CFrame)
+                    end
+                end)
+            end
         end
-    end
     end
 end
 
@@ -276,15 +277,6 @@ local function snipe(hrp)
             hop()
         end
     end
-end
-
-local function findChest()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and (obj.Name == "Chest1" or obj.Name == "Chest2" or obj.Name == "Chest3") then
-            return obj
-        end
-    end
-    return nil
 end
 
 local function farmChests(hrp)

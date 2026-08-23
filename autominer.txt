@@ -4,8 +4,8 @@ local RS = game:GetService("ReplicatedStorage")
 local UIS = game:GetService("UserInputService")
 local RSVC = game:GetService("RunService")
 local LP = P.LocalPlayer
-local Char = LP.Character or LP.CharacterAdded:Wait()
-local HRP = Char:WaitForChild("HumanoidRootPart")
+local Char = LP.Character
+local HRP = Char and Char:FindFirstChild("HumanoidRootPart")
 
 for _, m in ipairs(WS:GetChildren()) do
     if m:IsA("Message") then m:Destroy() end

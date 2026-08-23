@@ -9,12 +9,12 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
 local statusMsg = Instance.new("Message")
-statusMsg.Text = "CRONUS v2 loading..."
+statusMsg.Text = "CHEST FARM LOADED v3"
 statusMsg.Parent = Workspace
 
 local function notify(t)
-    pcall(function() statusMsg.Text = "[Cronus] " .. tostring(t) end)
-    print("[Cronus]", tostring(t))
+    pcall(function() statusMsg.Text = "[CHEST] " .. tostring(t) end)
+    print("[CHEST]", tostring(t))
 end
 
 local Settings = {
@@ -26,7 +26,7 @@ local Settings = {
     ScanInterval = 1.0,
     InteractCooldown = 0.3,
     AvoidVoidY = -50,
-    ChestNames = { "chest", "crate", "loot", "reward", "supply", "bounty", "bandit", "combat", "collect", "gift", "present" },
+    ChestNames = { "chest", "crate", "loot", "reward", "supply", "bounty", "bandit", "combat", "collect", "gift", "present", "box", "safe" },
     FilterItems = { "no3 sawed off", "clue scroll" },
 }
 
@@ -54,41 +54,24 @@ local function chestNameHit(name)
     return false
 end
 
+local function chestPos(obj)
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart.Position end
+        local p = obj:FindFirstChildWhichIsA("BasePart")
+        if p then return p.Position end
+    end
+    local p = obj:FindFirstChildWhichIsA("BasePart")
+    if p then return p.Position end
+    return nil
+end
+
 local function isChest(obj)
-    if chestNameHit(obj.Name) then
-        local pos = nil
-        if obj:IsA("BasePart") then pos = obj.Position
-        elseif obj:IsA("Model") then
-            if obj.PrimaryPart then pos = obj.PrimaryPart.Position
-            else
-                local p = obj:FindFirstChildWhichIsA("BasePart")
-                if p then pos = p.Position end
-            end
-        else
-            local p = obj:FindFirstChildWhichIsA("BasePart")
-            if p then pos = p.Position end
-        end
-        if not pos then return false end
-        if pos.Y < Settings.AvoidVoidY then return false end
-        return true, pos
-    end
-    if isInteractive(obj) then
-        local pos = nil
-        if obj:IsA("BasePart") then pos = obj.Position
-        elseif obj:IsA("Model") then
-            if obj.PrimaryPart then pos = obj.PrimaryPart.Position
-            else
-                local p = obj:FindFirstChildWhichIsA("BasePart")
-                if p then pos = p.Position end
-            end
-        else
-            local p = obj:FindFirstChildWhichIsA("BasePart")
-            if p then pos = p.Position end
-        end
-        if not pos then return false end
-        if pos.Y < Settings.AvoidVoidY then return false end
-        return true, pos
-    end
+    local pos = chestPos(obj)
+    if not pos then return false end
+    if pos.Y < Settings.AvoidVoidY then return false end
+    if chestNameHit(obj.Name) then return true, pos end
+    if isInteractive(obj) then return true, pos end
     return false
 end
 
@@ -99,20 +82,10 @@ local function scanWorld()
         local ok, pos = isChest(obj)
         if ok then
             table.insert(results, { Object = obj, Position = pos })
-            if #samples < 12 then
-                table.insert(samples, obj.Name)
-            end
+            if #samples < 14 then table.insert(samples, obj.Name) end
         end
     end
-    table.insert(State.SampleChestNames, "lastscan:" .. #results)
-    for _, s in ipairs(samples) do
-        table.insert(State.SampleChestNames, s)
-    end
-    if #State.SampleChestNames > 30 then
-        for i = 1, (#State.SampleChestNames - 30) do
-            table.remove(State.SampleChestNames, 1)
-        end
-    end
+    State.SampleChestNames = samples
     return results
 end
 
@@ -126,7 +99,7 @@ local function discoverRemotes()
             local n = string.lower(obj.Name)
             if string.find(n, "claim") or string.find(n, "take") or string.find(n, "give") or string.find(n, "collect") or string.find(n, "pickup") or string.find(n, "reward") then
                 table.insert(claims, obj)
-            elseif string.find(n, "chest") or string.find(n, "loot") or string.find(n, "crate") or string.find(n, "open") or string.find(n, "item") or string.find(n, "inv") or string.find(n, "use") or string.find(n, "interact") or string.find(n, "reward") then
+            elseif string.find(n, "chest") or string.find(n, "loot") or string.find(n, "crate") or string.find(n, "open") or string.find(n, "item") or string.find(n, "inv") or string.find(n, "use") or string.find(n, "interact") or string.find(n, "reward") or string.find(n, "crate") then
                 table.insert(opens, obj)
             end
         end
@@ -244,7 +217,7 @@ local function farmTick()
     if now - State.LastScan >= Settings.ScanInterval then
         State.Chests = scanWorld()
         State.LastScan = now
-        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Chests:" .. #State.Chests .. " Remotes:open=" .. #State.OpenRemotes .. " claim=" .. #State.ClaimRemotes .. " | [P] diag [F]arm")
+        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Chests:" .. #State.Chests .. " openR=" .. #State.OpenRemotes .. " claimR=" .. #State.ClaimRemotes .. " | [P]diag [F]arm")
     end
     if #State.Chests > 0 and (now - State.LastInteract) >= Settings.InteractCooldown then
         local target = State.Chests[1]
@@ -322,28 +295,26 @@ UserInputService.InputBegan:Connect(function(inp, g)
     elseif k == Enum.KeyCode.P then
         State.Chests = scanWorld()
         discoverRemotes()
-        local diag = "DIAG chests=" .. #State.Chests .. " | samples: "
-        for i = 1, math.min(8, #State.SampleChestNames) do
-            diag = diag .. State.SampleChestNames[i] .. ", "
+        local diag = "DIAG chests=" .. #State.Chests .. " | samples:"
+        for i = 1, math.min(10, #State and 10 or 10) do end
+        local smp = ""
+        for i = 1, math.min(10, #State.SampleChestNames) do
+            smp = smp .. " " .. State.SampleChestNames[i] .. ","
         end
-        diag = diag .. " | openR: "
-        for i = 1, math.min(10, #State.OpenRemotes) do
-            diag = diag .. State.OpenRemotes[i].Name .. ","
-        end
-        notify(diag)
-        print("[Cronus DIAG] chests=" .. #State.Chests)
+        notify("DIAG chests=" .. #State.Chests .. " samples:" .. smp .. " openR=" .. #State.OpenRemotes .. " claimR=" .. #State.ClaimRemotes .. " allR=" .. #State.AllRemotes)
+        print("[CHEST DIAG] chests=" .. #State.Chests)
         for _, s in ipairs(State.SampleChestNames) do print("  chestsample:", s) end
-        print("[Cronus DIAG] openRemotes=" .. #State.OpenRemotes)
-        for _, r in ipairs(State.OpenRemotes) do print("  open:", r.Name) end
-        print("[Cronus DIAG] claimRemotes=" .. #State.ClaimRemotes)
-        for _, r in ipairs(State.ClaimRemotes) do print("  claim:", r.Name) end
+        print("[CHEST DIAG] ALL remote events (" .. #State.AllRemotes .. "):")
+        for i, rn in ipairs(State.AllRemotes) do
+            if i <= 60 then print("  R:", rn) end
+        end
     end
 end)
 
 discoverRemotes()
 setNoclip(Settings.Noclip)
 setFarm(Settings.FarmEnabled)
-notify("CRONUS v2 READY. FARM auto-on. [P]=diag [F]arm [N]oclip [T]p")
+notify("CHEST FARM v3 READY. auto-on. [P]=diag [F]arm [N]oclip [T]p")
 spawn(function()
     while true do
         discoverRemotes()

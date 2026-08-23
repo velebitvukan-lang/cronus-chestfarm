@@ -274,7 +274,7 @@ local function farmTick()
         scanWorld()
         discoverRemotes()
         State.LastScan = now
-        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Ores:" .. #State.Ores .. " Gems:" .. #State.Gems .. " Mined:" .. State.MinedCount .. "/" .. Settings.SellThreshold .. " | [F] on/off [S] sell [P]diag")
+        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Ores:" .. #State.Ores .. " Gems:" .. #State.Gems .. " Mined:" .. State.MinedCount .. "/" .. Settings.SellThreshold .. " | [J] start [N] sell [P]diag")
     end
     if not Settings.FarmEnabled then return end
     if Settings.SellWhenFull and State.MinedCount >= Settings.SellThreshold then
@@ -352,7 +352,7 @@ end)
 UserInputService.InputBegan:Connect(function(inp, g)
     if g then return end
     local k = inp.KeyCode
-    if k == Enum.KeyCode.F then
+    if k == Enum.KeyCode.J then
         Settings.FarmEnabled = not Settings.FarmEnabled
         if Settings.FarmEnabled then
             Settings.Noclip = true
@@ -361,14 +361,14 @@ UserInputService.InputBegan:Connect(function(inp, g)
         end
         setFarm(Settings.FarmEnabled)
         notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " NOCLIP:ON TP:ON Ores:" .. #State.Ores)
-    elseif k == Enum.KeyCode.N then
+    elseif k == Enum.KeyCode.M then
         Settings.Noclip = not Settings.Noclip
         setNoclip(Settings.Noclip)
         notify("NOCLIP:" .. (Settings.Noclip and "ON" or "OFF"))
     elseif k == Enum.KeyCode.T then
         Settings.Teleport = not Settings.Teleport
         notify("TELEPORT:" .. (Settings.Teleport and "ON" or "OFF"))
-    elseif k == Enum.KeyCode.S then
+    elseif k == Enum.KeyCode.N then
         doSell()
     elseif k == Enum.KeyCode.P then
         scanWorld()
@@ -385,7 +385,7 @@ end)
 
 discoverRemotes()
 setNoclip(Settings.Noclip)
-notify("AUTOMINER v3 READY. [F]=ON/OFF [S]=sell [N]oclip [T]p [P]diag")
+notify("AUTOMINER v3 READY. [J]=START/STOP [N]=sell [M]oclip [T]p [P]diag")
 spawn(function()
     while true do
         discoverRemotes()

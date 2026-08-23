@@ -104,6 +104,14 @@ local function discoverRemotes()
             end
         end
     end
+    local exactOpens = { "OtvoriSkrinjuEvent", "OtvoriSkrinju", "OpenChest", "OpenChestEvent", "OpenLootChest", "OpenCombatChest" }
+    for _, en in ipairs(exactOpens) do
+        local r = ReplicatedStorage:FindFirstChild(en, true)
+        if r and r:IsA("RemoteEvent") then
+            table.insert(opens, r)
+            table.insert(all, r.Name)
+        end
+    end
     State.AllRemotes = all
     State.OpenRemotes = opens
     State.ClaimRemotes = claims

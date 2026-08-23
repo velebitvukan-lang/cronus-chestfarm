@@ -9,7 +9,7 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
 local statusMsg = Instance.new("Message")
-statusMsg.Text = "AUTOMINER LOADED v2"
+statusMsg.Text = "AUTOMINER LOADED v3"
 statusMsg.Parent = Workspace
 
 local function notify(t)
@@ -28,9 +28,13 @@ local Settings = {
     AvoidVoidY = -50,
     OreNames = { "coal", "copper" },
     GemNames = { "gem", "diamond", "ruby", "emerald", "sapphire", "amber", "jade" },
+    SellTargetNames = { "sell", "vendor", "shop", "store", "sales", "miner", "orebuyer", "buyer", "deposit", "trader" },
     ToolNames = { "pickaxe", "pick", "stone pickaxe", "iron pickaxe", "gold pickaxe", "copper pickaxe", "coal pickaxe", "drill", "mining tool" },
     OreRemoteGuesses = { "MineRock", "MineOre", "HitRock", "BreakRock", "OreMined", "Mine", "Rock", "Pickaxe", "HitOre", "CollectOre", "DamageRock", "MineNode", "MineOre", "Ore", "MineCoal", "MineCopper" },
     GemRemoteGuesses = { "CollectGem", "PickupGem", "GemPickup", "CollectItem", "Pickup", "GrabGem", "Collect", "PickUp" },
+    SellRemoteGuesses = { "SellOre", "SellAll", "SellInventory", "Sell", "StoreOre", "SellItems", "DepositOre", "SellOres", "BankOre" },
+    SellWhenFull = true,
+    SellThreshold = 25,
 }
 
 local State = {
@@ -40,7 +44,9 @@ local State = {
     LastInteract = 0,
     OreRemotes = {},
     GemRemotes = {},
+    SellRemotes = {},
     SampleOreNames = {},
+    MinedCount = 0,
 }
 
 local function objPos(obj)
@@ -102,6 +108,7 @@ end
 local function discoverRemotes()
     local ores = {}
     local gems = {}
+    local sells = {}
     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
             local n = string.lower(obj.Name)
@@ -111,10 +118,14 @@ local function discoverRemotes()
             for _, g in ipairs(Settings.GemRemoteGuesses) do
                 if string.find(n, string.lower(g)) then table.insert(gems, obj) break end
             end
+            for _, g in ipairs(Settings.SellRemoteGuesses) do
+                if string.find(n, string.lower(g)) then table.insert(sells, obj) break end
+            end
         end
     end
     State.OreRemotes = ores
     State.GemRemotes = gems
+    State.SellRemotes = sells
 end
 
 local function equipTool()
@@ -222,15 +233,54 @@ local function collectGem(gem)
     return fired
 end
 
+local function findSellTarget()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if nameHit(obj.Name, Settings.SellTargetNames) then
+            local p = objPos(obj)
+            if p then return obj, p end
+        end
+    end
+    return nil, nil
+end
+
+local function doSell()
+    local tgt, pos = findSellTarget()
+    if tgt and pos then
+        goTo(pos)
+        local cd = tgt:FindFirstChildWhichIsA("ClickDetector")
+        if cd then
+            pcall(function() cd:FireServer() end)
+            pcall(function() cd.MouseClick:Fire(LocalPlayer) end)
+        end
+        local pp = tgt:FindFirstChildWhichIsA("ProximityPrompt")
+        if pp then
+            pcall(function() pp:InputHoldBegin() wait(0.1) pp:InputHoldEnd() end)
+            pcall(function() pp:Trigger() end)
+        end
+    end
+    for _, r in ipairs(State.SellRemotes) do
+        pcall(function() r:FireServer() end)
+        pcall(function() r:FireServer("Ore") end)
+        pcall(function() r:FireServer("all") end)
+        pcall(function() r:FireServer(true) end)
+    end
+    notify("SOLD inventory (mined " .. State.MinedCount .. ")")
+    State.MinedCount = 0
+end
+
 local function farmTick()
     local now = tick()
     if now - State.LastScan >= Settings.ScanInterval then
         scanWorld()
         discoverRemotes()
         State.LastScan = now
-        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Ores:" .. #State.Ores .. " Gems:" .. #State.Gems .. " | [F] on/off [P]diag")
+        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Ores:" .. #State.Ores .. " Gems:" .. #State.Gems .. " Mined:" .. State.MinedCount .. "/" .. Settings.SellThreshold .. " | [F] on/off [S] sell [P]diag")
     end
     if not Settings.FarmEnabled then return end
+    if Settings.SellWhenFull and State.MinedCount >= Settings.SellThreshold then
+        doSell()
+        return
+    end
     if now - State.LastInteract >= Settings.InteractCooldown then
         if #State.Gems > 0 then
             local g = State.Gems[1]
@@ -248,7 +298,8 @@ local function farmTick()
             if o and o.Object and o.Object.Parent then
                 goTo(o.Position)
                 mineOre(o.Object)
-                notify("mined: " .. o.Object.Name)
+                State.MinedCount = State.MinedCount + 1
+                notify("mined: " .. o.Object.Name .. " (" .. State.MinedCount .. ")")
                 State.LastInteract = now
                 table.remove(State.Ores, 1)
             end
@@ -317,6 +368,8 @@ UserInputService.InputBegan:Connect(function(inp, g)
     elseif k == Enum.KeyCode.T then
         Settings.Teleport = not Settings.Teleport
         notify("TELEPORT:" .. (Settings.Teleport and "ON" or "OFF"))
+    elseif k == Enum.KeyCode.S then
+        doSell()
     elseif k == Enum.KeyCode.P then
         scanWorld()
         discoverRemotes()
@@ -324,7 +377,7 @@ UserInputService.InputBegan:Connect(function(inp, g)
         for i = 1, math.min(10, #State.SampleOreNames) do
             smp = smp .. " " .. State.SampleOreNames[i] .. ","
         end
-        notify("DIAG ores=" .. #State.Ores .. " gems=" .. #State.Gems .. " samples:" .. smp)
+        notify("DIAG ores=" .. #State.Ores .. " gems=" .. #State.Gems .. " sellR=" .. #State.SellRemotes .. " samples:" .. smp)
         print("[MINER DIAG] ores=" .. #State.Ores)
         for _, s in ipairs(State.SampleOreNames) do print("  oresample:", s) end
     end
@@ -332,7 +385,7 @@ end)
 
 discoverRemotes()
 setNoclip(Settings.Noclip)
-notify("AUTOMINER v2 READY. [F]=ON/OFF [N]oclip [T]p [P]diag")
+notify("AUTOMINER v3 READY. [F]=ON/OFF [S]=sell [N]oclip [T]p [P]diag")
 spawn(function()
     while true do
         discoverRemotes()

@@ -8,7 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LP = Players.LocalPlayer
 local PG = LP:WaitForChild("PlayerGui")
 
-local FRUITS = {"Rocket","Spin","Blade","Spring","Bomb","Smoke","Spike","Flame","Falcon","Ice","Sand","Dark","Diamond","Light","Rubber","Barrier","Ghost","Magma","Quake","Buddha","Love","Spider","Sound","Phoenix","Portal","Blizzard","Gravity","Mammoth","T-Rex","Dough","Shadow","Venom","Control","Spirit","Yeti","Gas","Kitsune","Leopard","Dragon"}
+local FRUITS = {"Rocket","Spin","Blade","Spring","Bomb","Smoke","Spike","Flame","Falcon","Ice","Sand","Dark","Diamond","Light","Rubber","Creation","Ghost","Magma","Quake","Buddha","Love","Spider","Sound","Phoenix","Portal","Blizzard","Gravity","Mammoth","T-Rex","Dough","Shadow","Venom","Control","Spirit","Yeti","Gas","Kitsune","Leopard","Dragon"}
 
 local Selected = {}
 for _, f in ipairs(FRUITS) do Selected[f] = true end

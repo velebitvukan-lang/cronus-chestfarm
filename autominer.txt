@@ -303,8 +303,13 @@ UserInputService.InputBegan:Connect(function(inp, g)
     local k = inp.KeyCode
     if k == Enum.KeyCode.F then
         Settings.FarmEnabled = not Settings.FarmEnabled
+        if Settings.FarmEnabled then
+            Settings.Noclip = true
+            Settings.Teleport = true
+            setNoclip(true)
+        end
         setFarm(Settings.FarmEnabled)
-        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Ores:" .. #State.Ores)
+        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " NOCLIP:ON TP:ON Ores:" .. #State.Ores)
     elseif k == Enum.KeyCode.N then
         Settings.Noclip = not Settings.Noclip
         setNoclip(Settings.Noclip)

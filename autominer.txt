@@ -1,0 +1,279 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+local statusMsg = Instance.new("Message")
+statusMsg.Text = "AUTOMINER LOADED v1"
+statusMsg.Parent = Workspace
+
+local function notify(t)
+    pcall(function() statusMsg.Text = "[MINER] " .. tostring(t) end)
+    print("[MINER]", tostring(t))
+end
+
+local Settings = {
+    FarmEnabled = true,
+    Noclip = true,
+    Teleport = true,
+    WalkSpeed = 70,
+    ArriveDistance = 5,
+    ScanInterval = 0.8,
+    InteractCooldown = 0.25,
+    AvoidVoidY = -50,
+    NodeNames = { "rock", "ore", "stone", "node", "mineral", "gold", "iron", "coal", "copper", "silver", "crystal", "gem", "vein", "deposit", "pick", "mine", "boulder", "orenode", "stonenode" },
+    ToolNames = { "pickaxe", "pick", "stone pickaxe", "iron pickaxe", "gold pickaxe", "axe", "drill", "mining tool" },
+    RemoteGuesses = { "MineRock", "MineOre", "HitRock", "BreakRock", "OreMined", "Mine", "Rock", "Pickaxe", "HitOre", "CollectOre", "DamageRock", "MineNode", "MineOre", "Ore" },
+}
+
+local State = {
+    Nodes = {},
+    LastScan = 0,
+    LastInteract = 0,
+    MineRemotes = {},
+    SampleNodeNames = {},
+}
+
+local function nodePos(obj)
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart.Position end
+        local p = obj:FindFirstChildWhichIsA("BasePart")
+        if p then return p.Position end
+    end
+    local p = obj:FindFirstChildWhichIsA("BasePart")
+    if p then return p.Position end
+    return nil
+end
+
+local function nodeNameHit(name)
+    local n = string.lower(name)
+    for _, frag in ipairs(Settings.NodeNames) do
+        if string.find(n, frag) then return true end
+    end
+    return false
+end
+
+local function isNode(obj)
+    local pos = nodePos(obj)
+    if not pos then return false end
+    if pos.Y < Settings.AvoidVoidY then return false end
+    if nodeNameHit(obj.Name) then return true, pos end
+    local cd = obj:FindFirstChildWhichIsA("ClickDetector")
+    local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
+    if cd or pp then return true, pos end
+    return false
+end
+
+local function scanWorld()
+    local results = {}
+    local samples = {}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        local ok, pos = isNode(obj)
+        if ok then
+            table.insert(results, { Object = obj, Position = pos })
+            if #samples < 14 then table.insert(samples, obj.Name) end
+        end
+    end
+    State.SampleNodeNames = samples
+    return results
+end
+
+local function discoverRemotes()
+    local mines = {}
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local n = string.lower(obj.Name)
+            for _, g in ipairs(Settings.RemoteGuesses) do
+                if string.find(n, string.lower(g)) then
+                    table.insert(mines, obj)
+                    break
+                end
+            end
+        end
+    end
+    State.MineRemotes = mines
+end
+
+local function equipTool()
+    local hum = Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return nil end
+    local tool = Character:FindFirstChildWhichIsA("Tool")
+    if not tool and LocalPlayer.Backpack then
+        for _, tn in ipairs(Settings.ToolNames) do
+            local t = LocalPlayer.Backpack:FindFirstChild(tn, true)
+            if t and t:IsA("Tool") then tool = t break end
+        end
+        if not tool then
+            tool = LocalPlayer.Backpack:FindFirstChildWhichIsA("Tool")
+        end
+    end
+    if tool then
+        pcall(function() hum:EquipTool(tool) end)
+    end
+    return tool
+end
+
+local function mineNode(node)
+    local fired = false
+    local cd = node:FindFirstChildWhichIsA("ClickDetector")
+    if cd then
+        pcall(function() cd:FireServer() end)
+        pcall(function() cd.MouseClick:Fire(LocalPlayer) end)
+        fired = true
+    end
+    for _, d in ipairs(node:GetDescendants()) do
+        if d:IsA("ClickDetector") then
+            pcall(function() d:FireServer() end)
+            pcall(function() d.MouseClick:Fire(LocalPlayer) end)
+            fired = true
+        end
+    end
+    local function trig(p)
+        pcall(function() p:InputHoldBegin() wait(0.08) p:InputHoldEnd() end)
+        pcall(function() p:Trigger() end)
+    end
+    local pp = node:FindFirstChildWhichIsA("ProximityPrompt")
+    if pp then trig(pp) fired = true end
+    for _, d in ipairs(node:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then trig(d) fired = true end
+    end
+    local tool = equipTool()
+    if tool then
+        pcall(function() tool:Activate() end)
+        local tr = tool:FindFirstChildWhichIsA("RemoteEvent")
+        if tr then
+            pcall(function() tr:FireServer(node) end)
+            pcall(function() tr:FireServer() end)
+        end
+        fired = true
+    end
+    for _, r in ipairs(State.MineRemotes) do
+        pcall(function() r:FireServer(node) end)
+        pcall(function() r:FireServer(node.Position) end)
+        pcall(function() r:FireServer() end)
+        fired = true
+    end
+    return fired
+end
+
+local function farmTick()
+    local now = tick()
+    if now - State.LastScan >= Settings.ScanInterval then
+        State.Nodes = scanWorld()
+        State.LastScan = now
+        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Nodes:" .. #State.Nodes .. " mineR:" .. #State.MineRemotes .. " | [P]diag [F]arm")
+    end
+    if #State.Nodes > 0 and (now - State.LastInteract) >= Settings.InteractCooldown then
+        local target = State.Nodes[1]
+        if target and target.Object and target.Object.Parent then
+            local ok, pos = isNode(target.Object)
+            if ok then
+                Character = LocalPlayer.Character
+                HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+                if Settings.Teleport and HumanoidRootPart then
+                    HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+                else
+                    if HumanoidRootPart then
+                        local hum = Character:FindFirstChildOfClass("Humanoid")
+                        if hum then hum.WalkSpeed = Settings.WalkSpeed end
+                        HumanoidRootPart.CFrame = HumanoidRootPart.CFrame:Lerp(CFrame.new(pos + Vector3.new(0, 3, 0)), 0.4)
+                    end
+                end
+                mineNode(target.Object)
+                notify("mined: " .. target.Object.Name)
+                State.LastInteract = now
+            end
+        end
+        table.remove(State.Nodes, 1)
+    end
+end
+
+local NoclipConn = nil
+local function setNoclip(on)
+    if NoclipConn then NoclipConn:Disconnect() NoclipConn = nil end
+    if on then
+        NoclipConn = RunService.Stepped:Connect(function()
+            local c = LocalPlayer.Character
+            if not c then return end
+            for _, part in ipairs(c:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+            local hum = c:FindFirstChildOfClass("Humanoid")
+            if hum then hum:ChangeState(11) end
+        end)
+    else
+        local c = LocalPlayer.Character
+        if c then
+            for _, part in ipairs(c:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = true end
+            end
+        end
+    end
+end
+
+local FarmConn = nil
+local function setFarm(on)
+    if FarmConn then FarmConn:Disconnect() FarmConn = nil end
+    if on then
+        FarmConn = RunService.Heartbeat:Connect(function()
+            local ok, err = pcall(farmTick)
+            if not ok then notify("ERR: " .. tostring(err)) end
+        end)
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+    if Settings.Noclip then setNoclip(true) end
+end)
+
+UserInputService.InputBegan:Connect(function(inp, g)
+    if g then return end
+    local k = inp.KeyCode
+    if k == Enum.KeyCode.F then
+        Settings.FarmEnabled = not Settings.FarmEnabled
+        setFarm(Settings.FarmEnabled)
+        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " Nodes:" .. #State.Nodes)
+    elseif k == Enum.KeyCode.N then
+        Settings.Noclip = not Settings.Noclip
+        setNoclip(Settings.Noclip)
+        notify("NOCLIP:" .. (Settings.Noclip and "ON" or "OFF"))
+    elseif k == Enum.KeyCode.T then
+        Settings.Teleport = not Settings.Teleport
+        notify("TELEPORT:" .. (Settings.Teleport and "ON" or "OFF"))
+    elseif k == Enum.KeyCode.P then
+        State.Nodes = scanWorld()
+        discoverRemotes()
+        local smp = ""
+        for i = 1, math.min(10, #State.SampleNodeNames) do
+            smp = smp .. " " .. State.SampleNodeNames[i] .. ","
+        end
+        notify("DIAG nodes=" .. #State.Nodes .. " samples:" .. smp .. " mineR=" .. #State.MineRemotes)
+        print("[MINER DIAG] nodes=" .. #State.Nodes)
+        for _, s in ipairs(State.SampleNodeNames) do print("  nodesample:", s) end
+        print("[MINER DIAG] mine remotes (" .. #State.MineRemotes .. "):")
+        for i, r in ipairs(State.MineRemotes) do
+            if i <= 40 then print("  R:", r.Name) end
+        end
+    end
+end)
+
+discoverRemotes()
+setNoclip(Settings.Noclip)
+setFarm(Settings.FarmEnabled)
+notify("AUTOMINER v1 READY. auto-on. [P]=diag [F]arm [N]oclip [T]p")
+spawn(function()
+    while true do
+        discoverRemotes()
+        wait(8)
+    end
+end)

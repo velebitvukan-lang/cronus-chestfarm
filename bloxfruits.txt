@@ -19,7 +19,8 @@ local lastQuest = 0
 local lastChest = 0
 local chestOrder = {"Chest1", "Chest2", "Chest3"}
 local chestIdx = 1
-local hoverY = 8
+local hoverY = 20
+local auraRange = 30
 
 local SG = Instance.new("ScreenGui")
 SG.Name = "BFHub"
@@ -302,20 +303,28 @@ local function finish(hrp)
     end
     local enemies = Workspace:FindFirstChild("Enemies")
     if enemies then
-        local target
+        local list = {}
         for _, e in ipairs(enemies:GetChildren()) do
             local h = e:FindFirstChild("HumanoidRootPart")
             local hum = e:FindFirstChild("Humanoid")
             if h and hum and hum.Health > 0 then
-                target = e
-                break
+                table.insert(list, e)
             end
         end
-        if target then
-            local h = target:FindFirstChild("HumanoidRootPart")
-            hoverAbove(hrp, h.Position)
-            attack()
-            setStatus("fighting " .. target.Name)
+        if #list > 0 then
+            local nearest = list[1]
+            local nd = (nearest.HumanoidRootPart.Position - hrp.Position).Magnitude
+            for _, e in ipairs(list) do
+                local d = (e.HumanoidRootPart.Position - hrp.Position).Magnitude
+                if d < nd then nd = d; nearest = e end
+            end
+            hoverAbove(hrp, nearest.HumanoidRootPart.Position)
+            for _, e in ipairs(list) do
+                if (e.HumanoidRootPart.Position - hrp.Position).Magnitude <= auraRange then
+                    attack()
+                end
+            end
+            setStatus("killaura vs " .. #list .. " enemies")
         else
             setStatus("cleared -> new quest")
             lastQuest = 0

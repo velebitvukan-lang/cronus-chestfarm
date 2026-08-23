@@ -215,6 +215,7 @@ local function bringFruits(hrp)
             end)
         end
     end
+    end
 end
 
 local function hop()

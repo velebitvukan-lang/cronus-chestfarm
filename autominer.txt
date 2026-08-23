@@ -19,7 +19,7 @@ end
 
 local Settings = {
     FarmEnabled = false,
-    Noclip = true,
+    Noclip = false,
     Teleport = true,
     WalkSpeed = 70,
     ArriveDistance = 5,
@@ -358,13 +358,11 @@ UserInputService.InputBegan:Connect(function(inp, g)
             Settings.Noclip = true
             Settings.Teleport = true
             setNoclip(true)
+        else
+            setNoclip(false)
         end
         setFarm(Settings.FarmEnabled)
-        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " NOCLIP:ON TP:ON Ores:" .. #State.Ores)
-    elseif k == Enum.KeyCode.M then
-        Settings.Noclip = not Settings.Noclip
-        setNoclip(Settings.Noclip)
-        notify("NOCLIP:" .. (Settings.Noclip and "ON" or "OFF"))
+        notify("FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " NOCLIP:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " TP:ON Ores:" .. #State.Ores)
     elseif k == Enum.KeyCode.T then
         Settings.Teleport = not Settings.Teleport
         notify("TELEPORT:" .. (Settings.Teleport and "ON" or "OFF"))
@@ -385,7 +383,7 @@ end)
 
 discoverRemotes()
 setNoclip(Settings.Noclip)
-notify("AUTOMINER v3 READY. [J]=START/STOP [N]=sell [M]oclip [T]p [P]diag")
+notify("AUTOMINER v3 READY. [J]=START/STOP [N]=sell [T]p [P]diag")
 spawn(function()
     while true do
         discoverRemotes()

@@ -5,6 +5,7 @@ local TweenService = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
 local LP = Players.LocalPlayer
 local PG = LP:WaitForChild("PlayerGui")
 
@@ -170,16 +171,20 @@ local function hoverAbove(hrp, pos)
     pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, hoverY, 0)) end)
 end
 
-local function attack()
+local function attack(targetPos)
     pcall(function()
         local c = LP.Character
         if not c then return end
+        local hrp = c:FindFirstChild("HumanoidRootPart")
+        if hrp and targetPos then
+            hrp.CFrame = CFrame.lookAt(hrp.Position, targetPos)
+        end
+        local human = c:FindFirstChildOfClass("Humanoid")
         local t = c:FindFirstChildOfClass("Tool")
         if not t and LP.Backpack then t = LP.Backpack:FindFirstChildOfClass("Tool") end
-        if t then
-            c:FindFirstChildOfClass("Humanoid"):EquipTool(t)
-            t:Activate()
-        end
+        if t then human:EquipTool(t) end
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton1(Vector2.new(0, 0))
     end)
 end
 
@@ -320,7 +325,7 @@ local function finish(hrp)
             end
             hoverAbove(hrp, nearest.HumanoidRootPart.Position)
             if (nearest.HumanoidRootPart.Position - hrp.Position).Magnitude <= auraRange then
-                attack()
+                attack(nearest.HumanoidRootPart.Position)
             end
             setStatus("killing " .. nearest.Name .. " (" .. #list .. " left)")
         else

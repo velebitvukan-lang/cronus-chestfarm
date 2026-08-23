@@ -21,7 +21,6 @@ local lastChest = 0
 local chestOrder = {"Chest1", "Chest2", "Chest3"}
 local chestIdx = 1
 local hoverY = 20
-local strikeGap = 6
 local auraRange = 50
 
 local SG = Instance.new("ScreenGui")
@@ -172,6 +171,19 @@ local function hoverAbove(hrp, pos)
     pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, hoverY, 0)) end)
 end
 
+local function extendWeapon()
+    pcall(function()
+        local c = LP.Character
+        if not c then return end
+        local t = c:FindFirstChildOfClass("Tool") or (LP.Backpack and LP.Backpack:FindFirstChildOfClass("Tool"))
+        if not t then return end
+        local part = t:FindFirstChild("Handle") or t:FindFirstChildOfClass("BasePart")
+        if not part then return end
+        part.Size = Vector3.new(0.6, 0.6, 60)
+        part.CFrame = c.HumanoidRootPart.CFrame * CFrame.new(0, 0, -30)
+    end)
+end
+
 local function attack(enemy)
     pcall(function()
         local c = LP.Character
@@ -182,9 +194,9 @@ local function attack(enemy)
         local t = c:FindFirstChildOfClass("Tool")
         if not t and LP.Backpack then t = LP.Backpack:FindFirstChildOfClass("Tool") end
         if t then human:EquipTool(t) end
+        extendWeapon()
         local eh = enemy and enemy:FindFirstChild("HumanoidRootPart")
         if eh then
-            hrp.CFrame = CFrame.new(eh.Position + Vector3.new(0, strikeGap, 0))
             hrp.CFrame = CFrame.lookAt(hrp.Position, eh.Position)
         end
         VirtualUser:CaptureController()

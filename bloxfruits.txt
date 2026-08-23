@@ -17,6 +17,9 @@ local State = { AutoFinish=false, AutoFarmMoney=false, FruitSniper=false, BringF
 local lastHop = 0
 local lastQuest = 0
 local lastChest = 0
+local chestOrder = {"Chest1", "Chest2", "Chest3"}
+local chestIdx = 1
+local hoverY = 8
 
 local SG = Instance.new("ScreenGui")
 SG.Name = "BFHub"
@@ -162,6 +165,10 @@ local function tp(hrp, pos)
     pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0)) end)
 end
 
+local function hoverAbove(hrp, pos)
+    pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, hoverY, 0)) end)
+end
+
 local function attack()
     pcall(function()
         local c = LP.Character
@@ -188,13 +195,16 @@ end
 
 local function findSelectedFruit()
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if fruitMatch(obj) then return obj end
+        if obj:IsA("Tool") and not obj:IsDescendantOf(LP.Character) and not obj:IsDescendantOf(LP.Backpack) then
+            if fruitMatch(obj) then return obj end
+        end
     end
     return nil
 end
 
 local function bringFruits(hrp)
     for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Tool") and not obj:IsDescendantOf(LP.Character) and not obj:IsDescendantOf(LP.Backpack) then
         if fruitMatch(obj) then
             pcall(function()
                 if obj:FindFirstChild("Handle") then
@@ -208,15 +218,21 @@ local function bringFruits(hrp)
 end
 
 local function hop()
-    pcall(function()
-        local ok, data = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
-        end)
-        if ok and data and data.data and #data.data > 0 then
+    local ok, err = pcall(function()
+        local data = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+        if data and data.data and #data.data > 0 then
             local s = data.data[math.random(1, #data.data)]
             TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LP)
+        else
+            TeleportService:Teleport(game.PlaceId, LP)
         end
     end)
+    if not ok then
+        pcall(function()
+            local ok2 = pcall(function() TeleportService:Teleport(game.PlaceId, LP) end)
+            if not ok2 then setStatus("hop fail: " .. tostring(err):sub(1, 40)) end
+        end)
+    end
 end
 
 local function snipe(hrp)
@@ -249,39 +265,62 @@ local function findChest()
 end
 
 local function farmChests(hrp)
-    local chest = findChest()
+    local want = chestOrder[chestIdx]
+    local chest
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == want then
+            chest = obj
+            break
+        end
+    end
     if chest then
         tp(hrp, chest.Position)
         pcall(function() firetouchinterest(chest, hrp, 0) firetouchinterest(chest, hrp, 1) end)
         setStatus("chest " .. chest.Name)
     else
-        setStatus("no chest")
+        setStatus("no " .. want)
     end
+    chestIdx = (chestIdx % #chestOrder) + 1
+end
+
+local function startQuest()
+    pcall(function()
+        local cf = ReplicatedStorage:FindFirstChild("Remotes")
+        if cf then
+            local comm = cf:FindFirstChild("CommF_")
+            if comm then comm:InvokeServer("StartQuest", "BanditQuest1", 1) end
+        end
+    end)
 end
 
 local function finish(hrp)
-    local enemies = Workspace:FindFirstChild("Enemies")
-    if enemies then
-        for _, e in ipairs(enemies:GetChildren()) do
-            local h = e:FindFirstChild("HumanoidRootPart")
-            if h and e:FindFirstChild("Humanoid") then
-                tp(hrp, h.Position)
-                attack()
-                setStatus("fighting " .. e.Name)
-                break
-            end
-        end
-    end
     local now = tick()
     if now - lastQuest > 5 then
         lastQuest = now
-        pcall(function()
-            local cf = ReplicatedStorage:FindFirstChild("Remotes")
-            if cf then
-                local comm = cf:FindFirstChild("CommF_")
-                if comm then comm:InvokeServer("StartQuest", "BanditQuest1", 1) end
+        startQuest()
+    end
+    local enemies = Workspace:FindFirstChild("Enemies")
+    if enemies then
+        local target
+        for _, e in ipairs(enemies:GetChildren()) do
+            local h = e:FindFirstChild("HumanoidRootPart")
+            local hum = e:FindFirstChild("Humanoid")
+            if h and hum and hum.Health > 0 then
+                target = e
+                break
             end
-        end)
+        end
+        if target then
+            local h = target:FindFirstChild("HumanoidRootPart")
+            hoverAbove(hrp, h.Position)
+            attack()
+            setStatus("fighting " .. target.Name)
+        else
+            setStatus("cleared -> new quest")
+            lastQuest = 0
+        end
+    else
+        setStatus("no enemies")
     end
 end
 

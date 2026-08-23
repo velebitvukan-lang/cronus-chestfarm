@@ -1,0 +1,297 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+local statusMsg = Instance.new("Message")
+statusMsg.Text = "CRONUS: loading..."
+statusMsg.Parent = Workspace
+
+local function notify(t)
+    pcall(function() statusMsg.Text = t end)
+    print("[Cronus]", t)
+end
+
+local Settings = {
+    FarmEnabled = false,
+    Noclip = true,
+    Teleport = true,
+    WalkSpeed = 70,
+    ArriveDistance = 6,
+    ScanInterval = 1.2,
+    InteractCooldown = 0.35,
+    AvoidVoidY = -50,
+    ChestNames = { "LootChest", "CombatChest", "Chest", "loot", "combat", "crate" },
+    FilterItems = { "no3 sawed off", "clue scroll" },
+    RemoteGuesses = {
+        "OpenChest", "LootChest", "CollectChest", "ChestInteract",
+        "OpenLootChest", "OpenCombatChest", "ClaimChest", "PickupChest",
+        "ChestOpened", "InteractChest", "ClaimLoot", "TakeItem", "GiveItem"
+    },
+}
+
+local State = {
+    Chests = {},
+    LastScan = 0,
+    LastInteract = 0,
+    ClaimRemotes = {},
+    OpenRemotes = {},
+}
+
+local function findRemote(name)
+    return ReplicatedStorage:FindFirstChild(name, true)
+end
+
+local function discoverRemotes()
+    local opens = {}
+    local claims = {}
+    for _, name in ipairs(Settings.RemoteGuesses) do
+        local r = findRemote(name)
+        if r and r:IsA("RemoteEvent") then
+            if string.find(string.lower(name), "claim") or string.find(string.lower(name), "take") or string.find(string.lower(name), "give") or string.find(string.lower(name), "collect") then
+                table.insert(claims, r)
+            else
+                table.insert(opens, r)
+            end
+        end
+    end
+    State.OpenRemotes = opens
+    State.ClaimRemotes = claims
+end
+
+local function itemAllowed(name)
+    if not name then return false end
+    local n = string.lower(name)
+    for _, frag in ipairs(Settings.FilterItems) do
+        if string.find(n, string.lower(frag)) then return true end
+    end
+    return false
+end
+
+local function chestPosition(obj)
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart.Position end
+        local p = obj:FindFirstChildWhichIsA("BasePart")
+        if p then return p.Position end
+    end
+    local part = obj:FindFirstChildWhichIsA("BasePart")
+    if part then return part.Position end
+    return nil
+end
+
+local function isChest(obj)
+    local name = string.lower(obj.Name)
+    local hit = false
+    for _, frag in ipairs(Settings.ChestNames) do
+        if string.find(name, string.lower(frag)) then hit = true break end
+    end
+    if not hit then
+        local has = obj:FindFirstChildWhichIsA("ClickDetector") or obj:FindFirstChildWhichIsA("ProximityPrompt")
+        if has then hit = true end
+    end
+    if not hit then return false end
+    local pos = chestPosition(obj)
+    if not pos then return false end
+    if pos.Y < Settings.AvoidVoidY then return false end
+    return true, pos
+end
+
+local function findChests()
+    local results = {}
+    local roots = { Workspace }
+    for _, c in ipairs(Workspace:GetChildren()) do
+        if c:IsA("Folder") or c:IsA("Model") then
+            table.insert(roots, c)
+        end
+    end
+    for _, root in ipairs(roots) do
+        for _, obj in ipairs(root:GetDescendants()) do
+            local ok, pos = isChest(obj)
+            if ok then
+                table.insert(results, { Object = obj, Position = pos })
+            end
+        end
+    end
+    return results
+end
+
+local function travelTo(pos)
+    Character = LocalPlayer.Character
+    if not Character then return false end
+    HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+    if not HumanoidRootPart then return false end
+    if Settings.Teleport then
+        HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+        return true
+    else
+        local hum = Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = Settings.WalkSpeed end
+        HumanoidRootPart.CFrame = HumanoidRootPart.CFrame:Lerp(CFrame.new(pos + Vector3.new(0, 3, 0)), 0.3)
+        return true
+    end
+end
+
+local function openChest(obj)
+    local fired = false
+    local cd = obj:FindFirstChildWhichIsA("ClickDetector")
+    if cd then
+        pcall(function() cd:FireServer() end)
+        pcall(function() cd.MouseClick:Fire(LocalPlayer) end)
+        fired = true
+    end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("ClickDetector") then
+            pcall(function() d:FireServer() end)
+            pcall(function() d.MouseClick:Fire(LocalPlayer) end)
+            fired = true
+        end
+    end
+    local function trig(p)
+        pcall(function() p:InputHoldBegin() wait(0.08) p:InputHoldEnd() end)
+        pcall(function() p:Trigger() end)
+    end
+    local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
+    if pp then trig(pp) fired = true end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then trig(d) fired = true end
+    end
+    for _, r in ipairs(State.OpenRemotes) do
+        pcall(function() r:FireServer(obj) end)
+        pcall(function() r:FireServer(obj.Position) end)
+        pcall(function() r:FireServer() end)
+        fired = true
+    end
+    return fired
+end
+
+local function claimLoot(chestObj, lootNames)
+    if lootNames and #lootNames > 0 then
+        for _, item in ipairs(lootNames) do
+            if itemAllowed(item) then
+                for _, r in ipairs(State.ClaimRemotes) do
+                    pcall(function() r:FireServer(item) end)
+                    pcall(function() r:FireServer(chestObj, item) end)
+                end
+            end
+        end
+    else
+        for _, r in ipairs(State.ClaimRemotes) do
+            pcall(function() r:FireServer(chestObj) end)
+            pcall(function() r:FireServer() end)
+        end
+    end
+end
+
+local function readChestLoot(obj)
+    local names = {}
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("StringValue") or d:IsA("TextLabel") or d:IsA("StringConstrainedValue") then
+            if d.Value and string.len(tostring(d.Value)) > 0 then
+                table.insert(names, tostring(d.Value))
+            end
+        end
+    end
+    return names
+end
+
+local function farmTick()
+    local now = tick()
+    if now - State.LastScan >= Settings.ScanInterval then
+        State.Chests = findChests()
+        State.LastScan = now
+        notify("CRONUS | FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " NOCLIP:" .. (Settings.Noclip and "ON" or "OFF") .. " TP:" .. (Settings.Teleport and "ON" or "OFF") .. " | Chests:" .. #State.Chests .. " | [F]arm [N]oclip [T]p [P]scan")
+    end
+    if #State.Chests > 0 and (now - State.LastInteract) >= Settings.InteractCooldown then
+        local target = State.Chests[1]
+        if target and target.Object and target.Object.Parent then
+            local ok, pos = isChest(target.Object)
+            if ok then
+                travelTo(pos)
+                openChest(target.Object)
+                local loot = readChestLoot(target.Object)
+                claimLoot(target.Object, loot)
+                notify("CRONUS | opened: " .. target.Object.Name)
+                State.LastInteract = now
+            end
+        end
+        table.remove(State.Chests, 1)
+    end
+end
+
+local NoclipConn = nil
+local function setNoclip(on)
+    if NoclipConn then NoclipConn:Disconnect() NoclipConn = nil end
+    if on then
+        NoclipConn = RunService.Stepped:Connect(function()
+            local c = LocalPlayer.Character
+            if not c then return end
+            for _, part in ipairs(c:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+            local hum = c:FindFirstChildOfClass("Humanoid")
+            if hum then hum:ChangeState(11) end
+        end)
+    else
+        local c = LocalPlayer.Character
+        if c then
+            for _, part in ipairs(c:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = true end
+            end
+        end
+    end
+end
+
+local FarmConn = nil
+local function setFarm(on)
+    if FarmConn then FarmConn:Disconnect() FarmConn = nil end
+    if on then
+        FarmConn = RunService.Heartbeat:Connect(function()
+            local ok, err = pcall(farmTick)
+            if not ok then notify("CRONUS ERR: " .. tostring(err)) end
+        end)
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+    if Settings.Noclip then setNoclip(true) end
+end)
+
+UserInputService.InputBegan:Connect(function(inp, g)
+    if g then return end
+    local k = inp.KeyCode
+    if k == Enum.KeyCode.F then
+        Settings.FarmEnabled = not Settings.FarmEnabled
+        setFarm(Settings.FarmEnabled)
+        notify("CRONUS | FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " NOCLIP:" .. (Settings.Noclip and "ON" or "OFF") .. " TP:" .. (Settings.Teleport and "ON" or "OFF") .. " | Chests:" .. #State.Chests .. " | [F]arm [N]oclip [T]p [P]scan")
+    elseif k == Enum.KeyCode.N then
+        Settings.Noclip = not Settings.Noclip
+        setNoclip(Settings.Noclip)
+        notify("CRONUS | FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " NOCLIP:" .. (Settings.Noclip and "ON" or "OFF") .. " TP:" .. (Settings.Teleport and "ON" or "OFF") .. " | Chests:" .. #State.Chests .. " | [F]arm [N]oclip [T]p [P]scan")
+    elseif k == Enum.KeyCode.T then
+        Settings.Teleport = not Settings.Teleport
+        notify("CRONUS | FARM:" .. (Settings.FarmEnabled and "ON" or "OFF") .. " NOCLIP:" .. (Settings.Noclip and "ON" or "OFF") .. " TP:" .. (Settings.Teleport and "ON" or "OFF") .. " | Chests:" .. #State.Chests .. " | [F]arm [N]oclip [T]p [P]scan")
+    elseif k == Enum.KeyCode.P then
+        State.Chests = findChests()
+        notify("CRONUS | scan: " .. #State.Chests .. " chests found")
+    end
+end)
+
+discoverRemotes()
+setNoclip(Settings.Noclip)
+notify("CRONUS READY. Keys: [F]arm [N]oclip [T]p [P]scan")
+spawn(function()
+    while true do
+        discoverRemotes()
+        wait(8)
+    end
+end)

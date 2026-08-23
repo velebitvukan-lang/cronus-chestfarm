@@ -171,18 +171,22 @@ local function hoverAbove(hrp, pos)
     pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, hoverY, 0)) end)
 end
 
-local function attack(targetPos)
+local function attack(enemy)
     pcall(function()
         local c = LP.Character
         if not c then return end
         local hrp = c:FindFirstChild("HumanoidRootPart")
-        if hrp and targetPos then
-            hrp.CFrame = CFrame.lookAt(hrp.Position, targetPos)
-        end
+        if not hrp then return end
         local human = c:FindFirstChildOfClass("Humanoid")
         local t = c:FindFirstChildOfClass("Tool")
         if not t and LP.Backpack then t = LP.Backpack:FindFirstChildOfClass("Tool") end
         if t then human:EquipTool(t) end
+        local eh = enemy and enemy:FindFirstChild("HumanoidRootPart")
+        if eh and eh:IsDescendantOf(Workspace) then
+            eh.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
+        end
+        local aim = (eh and eh.Position) or hrp.Position
+        hrp.CFrame = CFrame.lookAt(hrp.Position, aim)
         VirtualUser:CaptureController()
         VirtualUser:ClickButton1(Vector2.new(0, 0))
     end)
@@ -325,7 +329,7 @@ local function finish(hrp)
             end
             hoverAbove(hrp, nearest.HumanoidRootPart.Position)
             if (nearest.HumanoidRootPart.Position - hrp.Position).Magnitude <= auraRange then
-                attack(nearest.HumanoidRootPart.Position)
+                attack(nearest)
             end
             setStatus("killing " .. nearest.Name .. " (" .. #list .. " left)")
         else

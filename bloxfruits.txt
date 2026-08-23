@@ -114,6 +114,44 @@ for i, f in ipairs(FRUITS) do
     end)
 end
 
+y = y + 152
+local bScan = Instance.new("TextButton")
+bScan.Size = UDim2.new(1, -20, 0, 28)
+bScan.Position = UDim2.new(0, 10, 0, y)
+bScan.BackgroundColor3 = Color3.fromRGB(30, 50, 90)
+bScan.TextColor3 = Color3.fromRGB(255, 255, 255)
+bScan.Text = "SCAN (see F9)"
+bScan.Font = Enum.Font.SourceSans
+bScan.Parent = Main
+bScan.MouseButton1Click:Connect(function()
+    local fr = {}
+    local chests = {}
+    local found = 0
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Tool") then
+            local nm = obj.Name
+            for f, _ in pairs(Selected) do
+                if Selected[f] and string.find(string.lower(nm), string.lower(f)) then
+                    found = found + 1
+                    if #fr < 12 then fr[#fr + 1] = nm end
+                    break
+                end
+            end
+        elseif obj:IsA("BasePart") and (obj.Name == "Chest1" or obj.Name == "Chest2" or obj.Name == "Chest3") then
+            chests[obj.Name] = (chests[obj.Name] or 0) + 1
+        end
+    end
+    local comm = false
+    pcall(function() comm = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("CommF_") ~= nil end)
+    local enemyCount = 0
+    pcall(function() enemyCount = #Workspace.Enemies:GetChildren() end)
+    print("[BFHUB SCAN] fruitTools=" .. found)
+    for _, n in ipairs(fr) do print("  fruit: " .. n) end
+    print("[BFHUB SCAN] chests=" .. HttpService:JSONEncode(chests))
+    print("[BFHUB SCAN] CommF_=" .. tostring(comm) .. " enemies=" .. enemyCount)
+    setStatus("scan done -> F9")
+end)
+
 local function getHRP()
     local c = LP.Character
     if c then return c:FindFirstChild("HumanoidRootPart") end

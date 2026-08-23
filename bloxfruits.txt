@@ -20,7 +20,7 @@ local lastChest = 0
 local chestOrder = {"Chest1", "Chest2", "Chest3"}
 local chestIdx = 1
 local hoverY = 20
-local auraRange = 30
+local auraRange = 20
 
 local SG = Instance.new("ScreenGui")
 SG.Name = "BFHub"
@@ -319,12 +319,10 @@ local function finish(hrp)
                 if d < nd then nd = d; nearest = e end
             end
             hoverAbove(hrp, nearest.HumanoidRootPart.Position)
-            for _, e in ipairs(list) do
-                if (e.HumanoidRootPart.Position - hrp.Position).Magnitude <= auraRange then
-                    attack()
-                end
+            if (nearest.HumanoidRootPart.Position - hrp.Position).Magnitude <= auraRange then
+                attack()
             end
-            setStatus("killaura vs " .. #list .. " enemies")
+            setStatus("killing " .. nearest.Name .. " (" .. #list .. " left)")
         else
             setStatus("cleared -> new quest")
             lastQuest = 0

@@ -1,27 +1,348 @@
-local P=game:GetService("Players")local WS=game:GetService("Workspace")local RS=game:GetService("ReplicatedStorage")local UIS=game:GetService("UserInputService")local RSVC=game:GetService("RunService")local LP=P.LocalPlayer
-local Char=LP.Character or LP.CharacterAdded:Wait()local HRP=Char:WaitForChild("HumanoidRootPart")
-local SM=Instance.new("Message")SM.Text="MINER v4 LOADED"SM.Parent=WS
-local function say(t)pcall(function()SM.Text="[MINER] "..tostring(t)end)print("[MINER]",tostring(t))end
-local S={Farm=false,Noclip=false,Tp=true,Walk=70,Scan=0.6,Cool=0.25,VoidY=-50,Ore={"coal","copper"},Gem={"gem","diamond","ruby","emerald","sapphire","amber","jade"},SellN={"sell","vendor","shop","store","sales","orebuyer","buyer","deposit","trader"},Tool={"pickaxe","pick","drill","mining tool","copper pickaxe","coal pickaxe","iron pickaxe","gold pickaxe","stone pickaxe"},OreR={"MineRock","MineOre","HitRock","BreakRock","OreMined","Mine","Rock","HitOre","CollectOre","DamageRock","MineNode","Ore","MineCoal","MineCopper"},GemR={"CollectGem","PickupGem","GemPickup","CollectItem","Pickup","GrabGem","Collect","PickUp"},SellR={"SellOre","SellAll","SellInventory","Sell","StoreOre","SellItems","DepositOre","SellOres","BankOre"},SellOn=true,Thresh=25}
-local St={Ores={},Gems={},OreR={},GemR={},SellR={},Samp={},Mined=0,LastScan=0,LastInt=0}
-local function pos(o)if o:IsA("BasePart")then return o.Position end if o:IsA("Model")then if o.PrimaryPart then return o.PrimaryPart.Position end local p=o:FindFirstChildWhichIsA("BasePart")if p then return p.Position end end local p=o:FindFirstChildWhichIsA("BasePart")if p then return p.Position end return nil end
-local function hit(n,l)local s=string.lower(n)for _,f in ipairs(l)do if string.find(s,f)then return true end end return false end
-local function isOre(o)local p=pos(o)if p and p.Y>S.VoidY and hit(o.Name,S.Ore)then return true,p end return false end
-local function isGem(o)local p=pos(o)if p and p.Y>S.VoidY and hit(o.Name,S.Gem)then return true,p end return false end
-local function scan()local o={}local g={}local s={}for _,x in ipairs(WS:GetDescendants())do local ok,p=isOre(x)if ok then table.insert(o,{x,p})if #s<14 then table.insert(s,x.Name)end end local ok2,p2=isGem(x)if ok2 then table.insert(g,{x,p2})end end St.Ores=o St.Gems=g St.Samp=s end
-local function disc()local o={}local g={}local se={}for _,x in ipairs(RS:GetDescendants())do if x:IsA("RemoteEvent")then local n=string.lower(x.Name)for _,y in ipairs(S.OreR)do if string.find(n,y)then table.insert(o,x)break end end for _,y in ipairs(S.GemR)do if string.find(n,y)then table.insert(g,x)break end end for _,y in ipairs(S.SellR)do if string.find(n,y)then table.insert(se,x)break end end end end St.OreR=o St.GemR=g St.SellR=se end
-local function equip()local h=Char and Char:FindFirstChildOfClass("Humanoid")if not h then return end local t=Char:FindFirstChildWhichIsA("Tool")if not t and LP.Backpack then for _,n in ipairs(S.Tool)do local tt=LP.Backpack:FindFirstChild(n,true)if tt and tt:IsA("Tool")then t=tt break end end if not t then t=LP.Backpack:FindFirstChildWhichIsA("Tool")end end if t then pcall(function()h:EquipTool(t)end)end return t end
-local function go(p)Char=LP.Character HRP=Char and Char:FindFirstChild("HumanoidRootPart")if not HRP then return end if S.Tp then HRP.CFrame=CFrame.new(p+Vector3.new(0,3,0))else local h=Char:FindFirstChildOfClass("Humanoid")if h then h.WalkSpeed=S.Walk end HRP.CFrame=HRP.CFrame:Lerp(CFrame.new(p+Vector3.new(0,3,0)),0.4)end end
-local function act(obj,remotes)local fired=false local cd=obj:FindFirstChildWhichIsA("ClickDetector")if cd then pcall(function()cd:FireServer()end)pcall(function()cd.MouseClick:Fire(LP)end)fired=true end for _,d in ipairs(obj:GetDescendants())do if d:IsA("ClickDetector")then pcall(function()d:FireServer()end)pcall(function()d.MouseClick:Fire(LP)end)fired=true end end local function tr(pp)pcall(function()pp:InputHoldBegin()wait(0.08)pp:InputHoldEnd()end)pcall(function()pp:Trigger()end)end local pp=obj:FindFirstChildWhichIsA("ProximityPrompt")if pp then tr(pp)fired=true end for _,d in ipairs(obj:GetDescendants())do if d:IsA("ProximityPrompt")then tr(d)fired=true end end local tl=equip()if tl then pcall(function()tl:Activate()end)local tr2=tl:FindFirstChildWhichIsA("RemoteEvent")if tr2 then pcall(function()tr2:FireServer(obj)end)pcall(function()tr2:FireServer()end)end fired=true end for _,r in ipairs(remotes)do pcall(function()r:FireServer(obj)end)pcall(function()r:FireServer(obj.Position)end)pcall(function()r:FireServer()end)fired=true end return fired end
-local function findSell()for _,x in ipairs(WS:GetDescendants())do if hit(x.Name,S.SellN)then local p=pos(x)if p then return x,p end end end return nil end
-local function sell()local t,p=findSell()if t and p then go(p)local cd=t:FindFirstChildWhichIsA("ClickDetector")if cd then pcall(function()cd:FireServer()end)pcall(function()cd.MouseClick:Fire(LP)end)end local pp=t:FindFirstChildWhichIsA("ProximityPrompt")if pp then pcall(function()pp:InputHoldBegin()wait(0.1)pp:InputHoldEnd()end)pcall(function()pp:Trigger()end)end end for _,r in ipairs(St.SellR)do pcall(function()r:FireServer()end)pcall(function()r:FireServer("Ore")end)pcall(function()r:FireServer("all")end)pcall(function()r:FireServer(true)end)end say("SOLD (mined "..St.Mined..")")St.Mined=0 end
-local function tick2()local n=tick()if n-St.LastScan>=S.Scan then scan()disc()St.LastScan=n say("FARM:"..(S.Farm and"ON"or"OFF").." Ores:"..#St.Ores.." Gems:"..#St.Gems.." Mined:"..St.Mined.."/"..S.Thresh.." | [J]start [N]sell [P]diag")end if not S.Farm then return end if S.SellOn and St.Mined>=S.Thresh then sell()return end if n-St.LastInt>=S.Cool then if #St.Gems>0 then local g=St.Gems[1]if g and g[1]and g[1].Parent then go(g[2])act(g[1],St.GemR)say("gem: "..g[1].Name)St.LastInt=n table.remove(St.Gems,1)return end end if #St.Ores>0 then local o=St.Ores[1]if o and o[1]and o[1].Parent then go(o[2])act(o[1],St.OreR)St.Mined=St.Mined+1 say("mined: "..o[1].Name.." ("..St.Mined..")")St.LastInt=n table.remove(St.Ores,1)end end end end
-local NC=nil local function setNoclip(on)if NC then NC:Disconnect()NC=nil end if on then NC=RSVC.Stepped:Connect(function()local c=LP.Character if not c then return end for _,p in ipairs(c:GetDescendants())do if p:IsA("BasePart")and p.CanCollide then p.CanCollide=false end end local h=c:FindFirstChildOfClass("Humanoid")if h then h:ChangeState(11)end end)else local c=LP.Character if c then for _,p in ipairs(c:GetDescendants())do if p:IsA("BasePart")then p.CanCollide=true end end end end end
-local FC=nil local function setFarm(on)if FC then FC:Disconnect()FC=nil end if on then FC=RSVC.Heartbeat:Connect(function()local ok,e=pcall(tick2)if not ok then say("ERR: "..tostring(e))end end)end end
-LP.CharacterAdded:Connect(function(c)Char=c HRP=c:WaitForChild("HumanoidRootPart")if S.Noclip then setNoclip(true)end end)
-UIS.InputBegan:Connect(function(i,g)if g then return end local k=i.KeyCode
-if k==Enum.KeyCode.J then S.Farm=not S.Farm if S.Farm then S.Noclip=true S.Tp=true setNoclip(true)else setNoclip(false)end setFarm(S.Farm)say("FARM:"..(S.Farm and"ON"or"OFF").." NOCLIP:"..(S.Farm and"ON"or"OFF").." TP:ON")
-elseif k==Enum.KeyCode.T then S.Tp=not S.Tp say("TELEPORT:"..(S.Tp and"ON"or"OFF"))
-elseif k==Enum.KeyCode.N then sell()
-elseif k==Enum.KeyCode.P then scan()disc()local s=""for i2=1,math.min(10,#St.Samp)do s=s.." "..St.Samp[i2]..","end say("DIAG ores="..#St.Ores.." gems="..#St.Gems.." sellR="..#St.SellR.." samples:"..s)print("[MINER DIAG] ores="..#St.Ores)for _,x in ipairs(St.Samp)do print("  ore:",x)end end end)
-disc()setNoclip(S.Noclip)say("MINER v4 READY. [J]start [N]sell [T]tp [P]diag")
+local P = game:GetService("Players")
+local WS = game:GetService("Workspace")
+local RS = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+local RSVC = game:GetService("RunService")
+local LP = P.LocalPlayer
+local Char = LP.Character or LP.CharacterAdded:Wait()
+local HRP = Char:WaitForChild("HumanoidRootPart")
+
+for _, m in ipairs(WS:GetChildren()) do
+    if m:IsA("Message") then m:Destroy() end
+end
+
+local SM = Instance.new("Message")
+SM.Text = "MINER v4 LOADED"
+SM.Parent = WS
+
+local function say(t)
+    pcall(function() SM.Text = "[MINER] " .. tostring(t) end)
+    print("[MINER]", tostring(t))
+end
+
+local S = {}
+S.Farm = false
+S.Noclip = false
+S.Tp = true
+S.Walk = 70
+S.Scan = 0.6
+S.Cool = 0.25
+S.VoidY = -50
+S.Ore = {"coal", "copper"}
+S.Gem = {"gem", "diamond", "ruby", "emerald", "sapphire", "amber", "jade"}
+S.SellN = {"sell", "vendor", "shop", "store", "sales", "orebuyer", "buyer", "deposit", "trader"}
+S.Tool = {"pickaxe", "pick", "drill", "mining tool"}
+S.OreR = {"MineRock", "MineOre", "HitRock", "BreakRock", "OreMined", "Mine", "Rock", "HitOre", "CollectOre", "DamageRock", "MineNode", "Ore", "MineCoal", "MineCopper"}
+S.GemR = {"CollectGem", "PickupGem", "GemPickup", "CollectItem", "Pickup", "GrabGem", "Collect", "PickUp"}
+S.SellR = {"SellOre", "SellAll", "SellInventory", "Sell", "StoreOre", "SellItems", "DepositOre", "SellOres", "BankOre"}
+S.SellOn = true
+S.Thresh = 25
+
+local St = {}
+St.Ores = {}
+St.Gems = {}
+St.OreR = {}
+St.GemR = {}
+St.SellR = {}
+St.Samp = {}
+St.Mined = 0
+St.LastScan = 0
+St.LastInt = 0
+
+local function pos(o)
+    if o:IsA("BasePart") then return o.Position end
+    if o:IsA("Model") then
+        if o.PrimaryPart then return o.PrimaryPart.Position end
+        local p = o:FindFirstChildWhichIsA("BasePart")
+        if p then return p.Position end
+    end
+    local p = o:FindFirstChildWhichIsA("BasePart")
+    if p then return p.Position end
+    return nil
+end
+
+local function hit(n, l)
+    local s = string.lower(n)
+    for _, f in ipairs(l) do
+        if string.find(s, f) then return true end
+    end
+    return false
+end
+
+local function isOre(o)
+    local p = pos(o)
+    if p and p.Y > S.VoidY and hit(o.Name, S.Ore) then return true, p end
+    return false
+end
+
+local function isGem(o)
+    local p = pos(o)
+    if p and p.Y > S.VoidY and hit(o.Name, S.Gem) then return true, p end
+    return false
+end
+
+local function scan()
+    local o = {}
+    local g = {}
+    local s = {}
+    for _, x in ipairs(WS:GetDescendants()) do
+        local ok, p = isOre(x)
+        if ok then
+            table.insert(o, {x, p})
+            if #s < 14 then table.insert(s, x.Name) end
+        end
+        local ok2, p2 = isGem(x)
+        if ok2 then
+            table.insert(g, {x, p2})
+        end
+    end
+    St.Ores = o
+    St.Gems = g
+    St.Samp = s
+end
+
+local function disc()
+    local o = {}
+    local g = {}
+    local se = {}
+    for _, x in ipairs(RS:GetDescendants()) do
+        if x:IsA("RemoteEvent") then
+            local n = string.lower(x.Name)
+            for _, y in ipairs(S.OreR) do
+                if string.find(n, y) then table.insert(o, x) break end
+            end
+            for _, y in ipairs(S.GemR) do
+                if string.find(n, y) then table.insert(g, x) break end
+            end
+            for _, y in ipairs(S.SellR) do
+                if string.find(n, y) then table.insert(se, x) break end
+            end
+        end
+    end
+    St.OreR = o
+    St.GemR = g
+    St.SellR = se
+end
+
+local function equip()
+    local h = Char and Char:FindFirstChildOfClass("Humanoid")
+    if not h then return end
+    local t = Char:FindFirstChildWhichIsA("Tool")
+    if not t and LP.Backpack then
+        for _, n in ipairs(S.Tool) do
+            local tt = LP.Backpack:FindFirstChild(n, true)
+            if tt and tt:IsA("Tool") then t = tt break end
+        end
+        if not t then t = LP.Backpack:FindFirstChildWhichIsA("Tool") end
+    end
+    if t then pcall(function() h:EquipTool(t) end) end
+    return t
+end
+
+local function go(p)
+    Char = LP.Character
+    HRP = Char and Char:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+    if S.Tp then
+        HRP.CFrame = CFrame.new(p + Vector3.new(0, 3, 0))
+    else
+        local h = Char:FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed = S.Walk end
+        HRP.CFrame = HRP.CFrame:Lerp(CFrame.new(p + Vector3.new(0, 3, 0)), 0.4)
+    end
+end
+
+local function act(obj, remotes)
+    local fired = false
+    local cd = obj:FindFirstChildWhichIsA("ClickDetector")
+    if cd then
+        pcall(function() cd:FireServer() end)
+        pcall(function() cd.MouseClick:Fire(LP) end)
+        fired = true
+    end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("ClickDetector") then
+            pcall(function() d:FireServer() end)
+            pcall(function() d.MouseClick:Fire(LP) end)
+            fired = true
+        end
+    end
+    local function tr(pp)
+        pcall(function() pp:InputHoldBegin() wait(0.08) pp:InputHoldEnd() end)
+        pcall(function() pp:Trigger() end)
+    end
+    local pp = obj:FindFirstChildWhichIsA("ProximityPrompt")
+    if pp then tr(pp) fired = true end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then tr(d) fired = true end
+    end
+    local tl = equip()
+    if tl then
+        pcall(function() tl:Activate() end)
+        local tr2 = tl:FindFirstChildWhichIsA("RemoteEvent")
+        if tr2 then
+            pcall(function() tr2:FireServer(obj) end)
+            pcall(function() tr2:FireServer() end)
+        end
+        fired = true
+    end
+    for _, r in ipairs(remotes) do
+        pcall(function() r:FireServer(obj) end)
+        pcall(function() r:FireServer(obj.Position) end)
+        pcall(function() r:FireServer() end)
+        fired = true
+    end
+    return fired
+end
+
+local function findSell()
+    for _, x in ipairs(WS:GetDescendants()) do
+        if hit(x.Name, S.SellN) then
+            local p = pos(x)
+            if p then return x, p end
+        end
+    end
+    return nil
+end
+
+local function sell()
+    local t, p = findSell()
+    if t and p then
+        go(p)
+        local cd = t:FindFirstChildWhichIsA("ClickDetector")
+        if cd then
+            pcall(function() cd:FireServer() end)
+            pcall(function() cd.MouseClick:Fire(LP) end)
+        end
+        local pp = t:FindFirstChildWhichIsA("ProximityPrompt")
+        if pp then
+            pcall(function() pp:InputHoldBegin() wait(0.1) pp:InputHoldEnd() end)
+            pcall(function() pp:Trigger() end)
+        end
+    end
+    for _, r in ipairs(St.SellR) do
+        pcall(function() r:FireServer() end)
+        pcall(function() r:FireServer("Ore") end)
+        pcall(function() r:FireServer("all") end)
+        pcall(function() r:FireServer(true) end)
+    end
+    say("SOLD (mined " .. St.Mined .. ")")
+    St.Mined = 0
+end
+
+local function tick2()
+    local n = tick()
+    if n - St.LastScan >= S.Scan then
+        scan()
+        disc()
+        St.LastScan = n
+        say("FARM:" .. (S.Farm and "ON" or "OFF") .. " Ores:" .. #St.Ores .. " Gems:" .. #St.Gems .. " Mined:" .. St.Mined .. "/" .. S.Thresh .. " | [J]start [N]sell [P]diag")
+    end
+    if not S.Farm then return end
+    if S.SellOn and St.Mined >= S.Thresh then
+        sell()
+        return
+    end
+    if n - St.LastInt >= S.Cool then
+        if #St.Gems > 0 then
+            local g = St.Gems[1]
+            if g and g[1] and g[1].Parent then
+                go(g[2])
+                act(g[1], St.GemR)
+                say("gem: " .. g[1].Name)
+                St.LastInt = n
+                table.remove(St.Gems, 1)
+                return
+            end
+        end
+        if #St.Ores > 0 then
+            local o = St.Ores[1]
+            if o and o[1] and o[1].Parent then
+                go(o[2])
+                act(o[1], St.OreR)
+                St.Mined = St.Mined + 1
+                say("mined: " .. o[1].Name .. " (" .. St.Mined .. ")")
+                St.LastInt = n
+                table.remove(St.Ores, 1)
+            end
+        end
+    end
+end
+
+local NC = nil
+local function setNoclip(on)
+    if NC then NC:Disconnect() NC = nil end
+    if on then
+        NC = RSVC.Stepped:Connect(function()
+            local c = LP.Character
+            if not c then return end
+            for _, p in ipairs(c:GetDescendants()) do
+                if p:IsA("BasePart") and p.CanCollide then
+                    p.CanCollide = false
+                end
+            end
+            local h = c:FindFirstChildOfClass("Humanoid")
+            if h then h:ChangeState(11) end
+        end)
+    else
+        local c = LP.Character
+        if c then
+            for _, p in ipairs(c:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = true end
+            end
+        end
+    end
+end
+
+local FC = nil
+local function setFarm(on)
+    if FC then FC:Disconnect() FC = nil end
+    if on then
+        FC = RSVC.Heartbeat:Connect(function()
+            local ok, e = pcall(tick2)
+            if not ok then say("ERR: " .. tostring(e)) end
+        end)
+    end
+end
+
+LP.CharacterAdded:Connect(function(c)
+    Char = c
+    HRP = c:WaitForChild("HumanoidRootPart")
+    if S.Noclip then setNoclip(true) end
+end)
+
+UIS.InputBegan:Connect(function(i, g)
+    if g then return end
+    local k = i.KeyCode
+    if k == Enum.KeyCode.J then
+        S.Farm = not S.Farm
+        if S.Farm then
+            S.Noclip = true
+            S.Tp = true
+            setNoclip(true)
+        else
+            setNoclip(false)
+        end
+        setFarm(S.Farm)
+        say("FARM:" .. (S.Farm and "ON" or "OFF") .. " NOCLIP:" .. (S.Farm and "ON" or "OFF") .. " TP:ON")
+    elseif k == Enum.KeyCode.T then
+        S.Tp = not S.Tp
+        say("TELEPORT:" .. (S.Tp and "ON" or "OFF"))
+    elseif k == Enum.KeyCode.N then
+        sell()
+    elseif k == Enum.KeyCode.P then
+        scan()
+        disc()
+        local s = ""
+        for i2 = 1, math.min(10, #St.Samp) do
+            s = s .. " " .. St.Samp[i2] .. ","
+        end
+        say("DIAG ores=" .. #St.Ores .. " gems=" .. #St.Gems .. " sellR=" .. #St.SellR .. " samples:" .. s)
+        print("[MINER DIAG] ores=" .. #St.Ores)
+        for _, x in ipairs(St.Samp) do print("  ore:", x) end
+    end
+end)
+
+disc()
+setNoclip(S.Noclip)
+say("MINER v4 READY. [J]start [N]sell [T]tp [P]diag")

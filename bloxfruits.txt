@@ -21,7 +21,7 @@ local lastChest = 0
 local chestOrder = {"Chest1", "Chest2", "Chest3"}
 local chestIdx = 1
 local hoverY = 20
-local auraRange = 20
+local auraRange = 50
 
 local SG = Instance.new("ScreenGui")
 SG.Name = "BFHub"

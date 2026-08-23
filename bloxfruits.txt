@@ -1,0 +1,263 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LP = Players.LocalPlayer
+local PG = LP:WaitForChild("PlayerGui")
+
+local FRUITS = {"Rocket","Spin","Blade","Spring","Bomb","Smoke","Spike","Flame","Falcon","Ice","Sand","Dark","Diamond","Light","Rubber","Barrier","Ghost","Magma","Quake","Buddha","Love","Spider","Sound","Phoenix","Portal","Blizzard","Gravity","Mammoth","T-Rex","Dough","Shadow","Venom","Control","Spirit","Yeti","Gas","Kitsune","Leopard","Dragon"}
+
+local Selected = {}
+for _, f in ipairs(FRUITS) do Selected[f] = true end
+
+local State = { AutoFinish=false, AutoFarmMoney=false, FruitSniper=false, BringFruit=false }
+local lastHop = 0
+local lastQuest = 0
+local lastChest = 0
+
+local SG = Instance.new("ScreenGui")
+SG.Name = "BFHub"
+SG.ResetOnSpawn = false
+SG.Parent = PG
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 330, 0, 470)
+Main.Position = UDim2.new(0.3, 0, 0.15, 0)
+Main.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+Main.BorderSizePixel = 2
+Main.BorderColor3 = Color3.fromRGB(120, 120, 200)
+Main.Active = true
+Main.Draggable = true
+Main.Parent = SG
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
+Title.Text = "BLOX FRUITS HUB"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = Main
+
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, 0, 0, 22)
+Status.Position = UDim2.new(0, 0, 0, 30)
+Status.BackgroundTransparency = 1
+Status.Text = "status: idle"
+Status.TextColor3 = Color3.fromRGB(0, 255, 120)
+Status.Parent = Main
+
+local function setStatus(t) pcall(function() Status.Text = "status: " .. t end) end
+
+local function makeToggle(text, y)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -20, 0, 32)
+    b.Position = UDim2.new(0, 10, 0, y)
+    b.BackgroundColor3 = Color3.fromRGB(60, 30, 30)
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.Text = text .. ": OFF"
+    b.Font = Enum.Font.SourceSans
+    b.Parent = Main
+    return b
+end
+
+local y = 58
+local tFinish = makeToggle("AutoFinish", y); y = y + 38
+local tMoney = makeToggle("AutoFarmMoney", y); y = y + 38
+local tSniper = makeToggle("FruitSniper", y); y = y + 38
+local tBring = makeToggle("BringFruitToMe", y); y = y + 38
+
+local function bindToggle(b, key)
+    b.MouseButton1Click:Connect(function()
+        State[key] = not State[key]
+        b.Text = b.Text:split(":")[1] .. ": " .. (State[key] and "ON" or "OFF")
+        b.BackgroundColor3 = State[key] and Color3.fromRGB(30, 100, 30) or Color3.fromRGB(60, 30, 30)
+        setStatus(b.Text:split(":")[1] .. " " .. (State[key] and "ON" or "OFF"))
+    end)
+end
+bindToggle(tFinish, "AutoFinish")
+bindToggle(tMoney, "AutoFarmMoney")
+bindToggle(tSniper, "FruitSniper")
+bindToggle(tBring, "BringFruit")
+
+local fl = Instance.new("TextLabel")
+fl.Size = UDim2.new(1, -20, 0, 20)
+fl.Position = UDim2.new(0, 10, 0, y)
+fl.BackgroundTransparency = 1
+fl.Text = "FruitSniper targets:"
+fl.TextColor3 = Color3.fromRGB(200, 200, 255)
+fl.Parent = Main
+y = y + 22
+
+local FruitFrame = Instance.new("ScrollingFrame")
+FruitFrame.Size = UDim2.new(1, -20, 0, 150)
+FruitFrame.Position = UDim2.new(0, 10, 0, y)
+FruitFrame.CanvasSize = UDim2.new(0, 0, 0, #FRUITS * 26)
+FruitFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+FruitFrame.Parent = Main
+
+for i, f in ipairs(FRUITS) do
+    local fb = Instance.new("TextButton")
+    fb.Size = UDim2.new(1, 0, 0, 24)
+    fb.Position = UDim2.new(0, 0, 0, (i-1)*26)
+    fb.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
+    fb.TextColor3 = Color3.fromRGB(255, 255, 255)
+    fb.Text = "[x] " .. f
+    fb.Font = Enum.Font.SourceSans
+    fb.Parent = FruitFrame
+    fb.MouseButton1Click:Connect(function()
+        Selected[f] = not Selected[f]
+        fb.Text = (Selected[f] and "[x] " or "[ ] ") .. f
+        fb.BackgroundColor3 = Selected[f] and Color3.fromRGB(30, 60, 30) or Color3.fromRGB(60, 30, 30)
+    end)
+end
+
+local function getHRP()
+    local c = LP.Character
+    if c then return c:FindFirstChild("HumanoidRootPart") end
+    return nil
+end
+
+local function tp(hrp, pos)
+    pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0)) end)
+end
+
+local function attack()
+    pcall(function()
+        local c = LP.Character
+        if not c then return end
+        local t = c:FindFirstChildOfClass("Tool")
+        if not t and LP.Backpack then t = LP.Backpack:FindFirstChildOfClass("Tool") end
+        if t then
+            c:FindFirstChildOfClass("Humanoid"):EquipTool(t)
+            t:Activate()
+        end
+    end)
+end
+
+local function fruitMatch(obj)
+    if not obj:IsA("Tool") then return false end
+    local nm = string.lower(obj.Name)
+    for f, _ in pairs(Selected) do
+        if Selected[f] and (nm == string.lower(f.."-"..f) or string.find(nm, string.lower(f))) then
+            return true
+        end
+    end
+    return false
+end
+
+local function findSelectedFruit()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if fruitMatch(obj) then return obj end
+    end
+    return nil
+end
+
+local function bringFruits(hrp)
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if fruitMatch(obj) then
+            pcall(function()
+                if obj:FindFirstChild("Handle") then
+                    obj.Handle.CFrame = hrp.CFrame
+                else
+                    obj:SetPrimaryPartCFrame(hrp.CFrame)
+                end
+            end)
+        end
+    end
+end
+
+local function hop()
+    pcall(function()
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+        end)
+        if ok and data and data.data and #data.data > 0 then
+            local s = data.data[math.random(1, #data.data)]
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LP)
+        end
+    end)
+end
+
+local function snipe(hrp)
+    local fruit = findSelectedFruit()
+    if fruit then
+        local pos = fruit:FindFirstChild("Handle") and fruit.Handle.Position or fruit:GetPivot().Position
+        tp(hrp, pos)
+        pcall(function()
+            if fruit:FindFirstChild("Handle") then fruit.Handle.CFrame = hrp.CFrame end
+        end)
+        pcall(function() firetouchinterest(fruit, hrp, 0) firetouchinterest(fruit, hrp, 1) end)
+        setStatus("sniped " .. fruit.Name)
+    else
+        local now = tick()
+        if now - lastHop > 8 then
+            lastHop = now
+            setStatus("no fruit, hopping")
+            hop()
+        end
+    end
+end
+
+local function findChest()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name == "Chest1" or obj.Name == "Chest2" or obj.Name == "Chest3") then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function farmChests(hrp)
+    local chest = findChest()
+    if chest then
+        tp(hrp, chest.Position)
+        pcall(function() firetouchinterest(chest, hrp, 0) firetouchinterest(chest, hrp, 1) end)
+        setStatus("chest " .. chest.Name)
+    else
+        setStatus("no chest")
+    end
+end
+
+local function finish(hrp)
+    local enemies = Workspace:FindFirstChild("Enemies")
+    if enemies then
+        for _, e in ipairs(enemies:GetChildren()) do
+            local h = e:FindFirstChild("HumanoidRootPart")
+            if h and e:FindFirstChild("Humanoid") then
+                tp(hrp, h.Position)
+                attack()
+                setStatus("fighting " .. e.Name)
+                break
+            end
+        end
+    end
+    local now = tick()
+    if now - lastQuest > 5 then
+        lastQuest = now
+        pcall(function()
+            local cf = ReplicatedStorage:FindFirstChild("Remotes")
+            if cf then
+                local comm = cf:FindFirstChild("CommF_")
+                if comm then comm:InvokeServer("StartQuest", "BanditQuest1", 1) end
+            end
+        end)
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+        local hrp = getHRP()
+        if hrp then
+            if State.BringFruit then bringFruits(hrp) end
+            if State.FruitSniper then snipe(hrp) end
+            if State.AutoFarmMoney then farmChests(hrp) end
+            if State.AutoFinish then finish(hrp) end
+        end
+    end
+end)
+
+setStatus("ready - toggle modules")

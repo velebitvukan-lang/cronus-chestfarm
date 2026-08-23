@@ -21,6 +21,7 @@ local lastChest = 0
 local chestOrder = {"Chest1", "Chest2", "Chest3"}
 local chestIdx = 1
 local hoverY = 20
+local strikeGap = 6
 local auraRange = 50
 
 local SG = Instance.new("ScreenGui")
@@ -182,11 +183,10 @@ local function attack(enemy)
         if not t and LP.Backpack then t = LP.Backpack:FindFirstChildOfClass("Tool") end
         if t then human:EquipTool(t) end
         local eh = enemy and enemy:FindFirstChild("HumanoidRootPart")
-        if eh and eh:IsDescendantOf(Workspace) then
-            eh.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
+        if eh then
+            hrp.CFrame = CFrame.new(eh.Position + Vector3.new(0, strikeGap, 0))
+            hrp.CFrame = CFrame.lookAt(hrp.Position, eh.Position)
         end
-        local aim = (eh and eh.Position) or hrp.Position
-        hrp.CFrame = CFrame.lookAt(hrp.Position, aim)
         VirtualUser:CaptureController()
         VirtualUser:ClickButton1(Vector2.new(0, 0))
     end)

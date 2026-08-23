@@ -18,6 +18,7 @@ local lastQuest = 0
 local chestOrder = {"Chest1", "Chest2", "Chest3"}
 local chestIdx = 1
 local hoverY = 20
+local strikeGap = 4
 local auraRange = 50
 
 local SG = Instance.new("ScreenGui")
@@ -200,7 +201,9 @@ local function attack(enemy)
         if t then human:EquipTool(t) end
         local eh = enemy and enemy:FindFirstChild("HumanoidRootPart")
         if eh then
+            hrp.CFrame = CFrame.new(eh.Position + Vector3.new(0, strikeGap, 0))
             hrp.CFrame = CFrame.lookAt(hrp.Position, eh.Position)
+            hrp.Velocity = Vector3.new(0, 0, 0)
         end
         extendWeapon()
         VirtualUser:CaptureController()

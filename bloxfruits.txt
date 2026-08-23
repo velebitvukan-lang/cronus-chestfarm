@@ -165,7 +165,10 @@ local function tp(hrp, pos)
 end
 
 local function hoverAbove(hrp, pos)
-    pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, hoverY, 0)) end)
+    pcall(function()
+        hrp.CFrame = CFrame.new(pos + Vector3.new(0, hoverY, 0))
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    end)
 end
 
 local function extendWeapon()
@@ -298,22 +301,53 @@ local function farmChests(hrp)
     chestIdx = (chestIdx % #chestOrder) + 1
 end
 
-local function startQuest()
+local QUESTS = {
+    {name="BanditQuest1", lvl=1, boss=false},
+    {name="PirateQuest1", lvl=10, boss=false},
+    {name="RichardQuest1", lvl=15, boss=false},
+    {name="ColosseumQuest1", lvl=25, boss=false},
+    {name="MagmaQuest1", lvl=45, boss=false},
+    {name="IceQuest1", lvl=90, boss=false},
+    {name="MarineQuest2", lvl=120, boss=false},
+    {name="SkyQuest1", lvl=150, boss=false},
+    {name="PrisonerQuest1", lvl=200, boss=false},
+    {name="HauntedQuest1", lvl=575, boss=false}
+}
+
+local function getLevel()
+    local ok, l = pcall(function() return LP:WaitForChild("Data"):WaitForChild("Level").Value end)
+    return ok and l or 1
+end
+
+local function questNameForLevel(lvl)
+    local best = QUESTS[1]
+    for _, q in ipairs(QUESTS) do
+        if not q.boss and q.lvl <= lvl then
+            if q.lvl >= best.lvl then best = q end
+        end
+    end
+    return best.name
+end
+
+local currentQuest = nil
+
+local function takeQuest(force)
     pcall(function()
         local cf = ReplicatedStorage:FindFirstChild("Remotes")
         if cf then
             local comm = cf:FindFirstChild("CommF_")
-            if comm then comm:InvokeServer("StartQuest", "BanditQuest1", 1) end
+            if comm then
+                local name = questNameForLevel(getLevel())
+                if force or name ~= currentQuest then
+                    comm:InvokeServer("StartQuest", name, 1)
+                    currentQuest = name
+                end
+            end
         end
     end)
 end
 
 local function finish(hrp)
-    local now = tick()
-    if now - lastQuest > 5 then
-        lastQuest = now
-        startQuest()
-    end
     local enemies = Workspace:FindFirstChild("Enemies")
     if enemies then
         local list = {}
@@ -332,13 +366,15 @@ local function finish(hrp)
                 if d < nd then nd = d; nearest = e end
             end
             hoverAbove(hrp, nearest.HumanoidRootPart.Position)
+            pcall(function() hrp.Velocity = Vector3.new(0, 0, 0) end)
             if (nearest.HumanoidRootPart.Position - hrp.Position).Magnitude <= auraRange then
                 attack(nearest)
             end
-            setStatus("killing " .. nearest.Name .. " (" .. #list .. " left)")
+            setStatus("killing " .. nearest.Name .. " (" .. #list .. " left) q:" .. tostring(currentQuest))
         else
-            setStatus("cleared -> new quest")
-            lastQuest = 0
+            setStatus("quest clear -> next")
+            currentQuest = nil
+            takeQuest()
         end
     else
         setStatus("no enemies")
@@ -353,7 +389,12 @@ task.spawn(function()
             if State.BringFruit then bringFruits(hrp) end
             if State.FruitSniper then snipe(hrp) end
             if State.AutoFarmMoney then farmChests(hrp) end
-            if State.AutoFinish then finish(hrp) end
+            if State.AutoFinish then
+                local now = tick()
+                if now - lastQuest > 10 then lastQuest = now; takeQuest(true) end
+                takeQuest()
+                finish(hrp)
+            end
         end
     end
 end)

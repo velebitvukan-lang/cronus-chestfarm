@@ -167,7 +167,7 @@ end
 
 local function hoverAbove(hrp, pos)
     pcall(function()
-        hrp.CFrame = CFrame.new(pos + Vector3.new(0, hoverY, 0))
+        hrp.CFrame = CFrame.new(pos - Vector3.new(0, hoverY, 0))
         hrp.Velocity = Vector3.new(0, 0, 0)
     end)
 end
@@ -201,7 +201,7 @@ local function attack(enemy)
         extendWeapon()
         local eh = enemy and enemy:FindFirstChild("HumanoidRootPart")
         if not eh then return end
-        hrp.CFrame = CFrame.new(eh.Position + Vector3.new(0, 2, 0))
+        hrp.CFrame = CFrame.new(eh.Position - Vector3.new(0, 6, 0))
         hrp.CFrame = CFrame.lookAt(hrp.Position, eh.Position)
         hrp.Velocity = Vector3.new(0, 0, 0)
         pcall(function() workspace.CurrentCamera.CFrame = CFrame.lookAt(hrp.Position, eh.Position) end)
